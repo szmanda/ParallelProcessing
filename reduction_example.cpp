@@ -35,6 +35,6 @@ int ReductionExample::compute(int noIterations, int noThreads) {
         suma += f(1000000);
     }
 
-    printf("%d\n", suma);
+    //printf("%d\n", suma);
     return suma;
 }

@@ -123,6 +123,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -135,8 +136,10 @@
     <ClCompile Include="ParallelProcessing.cpp" />
     <ClCompile Include="reduction_example.cpp" />
     <ClCompile Include="reduction_example_test.cpp" />
+    <ClCompile Include="pi_example.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="pi_example.h" />
     <ClInclude Include="reduction_example.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

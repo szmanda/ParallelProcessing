@@ -24,9 +24,15 @@
     <ClCompile Include="reduction_example_test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="pi_example.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="reduction_example.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pi_example.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
