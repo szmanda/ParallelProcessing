@@ -42,7 +42,7 @@ using namespace std;
 int checkCudaErrors() {
     int err = cudaGetLastError();
     if (err != cudaSuccess)
-        printf("CUDA ERROR no: %d", err);
+        printf("CUDA ERROR %d", err);
     return err;
 }
 
@@ -64,6 +64,15 @@ int main(int argc, char *argv[]) {
   int num_gpus = 0;  // number of CUDA GPUs
 
   printf("%s Starting...\n\n", argv[0]);
+
+
+  int runtimeVersion;
+  cudaRuntimeGetVersion(&runtimeVersion);
+
+  int major = runtimeVersion / 1000;
+  int minor = (runtimeVersion % 100) / 10;
+  printf("CUDA Toolkit Version: %d.%d\n", major, minor);
+
 
   /////////////////////////////////////////////////////////////////
   // determine the number of CUDA capable GPUs
@@ -152,10 +161,7 @@ int main(int argc, char *argv[]) {
   }
   printf("---------------------------\n");
 
-  if (cudaSuccess != cudaGetLastError())
-      printf("%s\n", cudaGetErrorString(cudaGetLastError()));
-  else
-      printf("code executed without errors");
+  checkCudaErrors();
 
   ////////////////////////////////////////////////////////////////
   // check the result
