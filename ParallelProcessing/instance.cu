@@ -28,8 +28,7 @@ void Instance::ExtractInstanceInfo() {
     else
         throw std::runtime_error("Unexpected filename");
 
-    s = std::stoi(name.substr(dotPos + 1, numErrorsOffset - dotPos - 1));
-    n = s + l - 1;
+    n = std::stoi(name.substr(dotPos + 1, numErrorsOffset - dotPos - 1)) + l - 1;
     numErrors = std::stoi(name.substr(numErrorsOffset + 1, name.length() - numErrorsOffset - 1));
 
     if (minusPos != std::string::npos && numErrors >= 40)
@@ -40,6 +39,8 @@ void Instance::ExtractInstanceInfo() {
         errorType = ErrorType::POSITIVE_RANDOM;
     else if (plusPos != std::string::npos)
         errorType = ErrorType::POSITIVE_WRONG_ENDING;
+    
+    s = n - l + 1 + numErrors * (errorType == ErrorType::NEGATIVE_REPEAT || errorType == ErrorType::NEGATIVE_RANDOM ? -1 : 1);
 }
 
 std::string Instance::toString() {
@@ -47,7 +48,7 @@ std::string Instance::toString() {
     if (!oligs.empty())
         oligonucleotideText = std::string(oligs[0].begin(), oligs[0].end());
 
-    return "Instance " + name + ": " + std::to_string(n) + " " + std::to_string(s) + " " + std::to_string(l) + " : " + std::to_string(oligs.size()) + " olinonucleotides, first: " + oligonucleotideText;
+    return "Instance " + name + ": " + std::to_string(n) + " " + std::to_string(s) + " " + std::to_string(l) + "\t: " + std::to_string(oligs.size()) + " olinonucleotides, first: " + oligonucleotideText;
 }
 
 std::string Instance::GetFileName(const std::string& path)

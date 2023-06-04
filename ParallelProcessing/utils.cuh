@@ -7,7 +7,7 @@
 
 class Utils
 {
-private:
+public:
     static std::string projectDirectory;
 
 public:
