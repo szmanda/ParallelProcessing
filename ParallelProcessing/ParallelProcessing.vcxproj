@@ -101,11 +101,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <CudaCompile Include="instance.cu" />
+    <CudaCompile Include="kernel.cu" />
     <CudaCompile Include="main.cu" />
     <CudaCompile Include="utils.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="instance.cuh" />
+    <ClInclude Include="kernel.cuh" />
     <ClInclude Include="utils.cuh" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -7,6 +7,7 @@
 #include <string>
 #include "utils.cuh"
 #include "instance.cuh"
+#include "kernel.cuh"
 
 using namespace std;
 
@@ -31,27 +32,27 @@ int correctResult(int* data, const int n, const int b) {
     return 1;
 }
 
-char* toChar(const std::vector<char>& olig, int l = 10) {
-    char* result = new char[l+1];
-    for (int i = 0; i < l; i++)
-        result[i] = olig[i];
-    result[l] = '\0';
-    return result;
-}
-
-void printSolution(int* solution, int** offsets, const std::vector<std::vector<char>>& oligs, int length, int start = 0) {
-    length--; // without last vertex;
-    printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\033[15A");
-    for (int k = 0; k + 2 < start % 15; k++) printf("\n");
-    for (int j = start; j < length; j++) {
-        printf("%s\033[10D\033[B", toChar(oligs[solution[j]]));
-        for (int k = 0; k < offsets[solution[j]][solution[j + 1]]; k++)
-            printf("\033[C");
-        if (j > 0 && j % 15 == 0) printf("\033[15A");
-        if (j + 1 == length) for (int k = length % 15; k < 15; k++) printf("\n");
-    }
-    printf("\n\n");
-}
+//char* toChar(const std::vector<char>& olig, int l = 10) {
+//    char* result = new char[l+1];
+//    for (int i = 0; i < l; i++)
+//        result[i] = olig[i];
+//    result[l] = '\0';
+//    return result;
+//}
+//
+//void printSolution(int* solution, int** offsets, const std::vector<std::vector<char>>& oligs, int length, int start = 0) {
+//    length--; // without last vertex;
+//    printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\033[15A");
+//    for (int k = 0; k + 2 < start % 15; k++) printf("\n");
+//    for (int j = start; j < length; j++) {
+//        printf("%s\033[10D\033[B", toChar(oligs[solution[j]]));
+//        for (int k = 0; k < offsets[solution[j]][solution[j + 1]]; k++)
+//            printf("\033[C");
+//        if (j > 0 && j % 15 == 0) printf("\033[15A");
+//        if (j + 1 == length) for (int k = length % 15; k < 15; k++) printf("\n");
+//    }
+//    printf("\n\n");
+//}
 
 int main(int argc, char* argv[]) {
 
@@ -86,6 +87,19 @@ int main(int argc, char* argv[]) {
                     break;
                 }
             }
+        }
+    }
+    char* oligs_flat = new char[s * s];
+    for (int ii = 0; ii < s; ii++) {
+        char* olig = toChar(instances[i].oligs[i]);
+        for (int j = 0; j < s; j++) {
+            oligs_flat[ii * l + j] = olig[j];
+        }
+    }
+    int* offsets_flat = new int[s * s];
+    for (int ii = 0; ii < s; ii++) {
+        for (int j = 0; j < s; j++) {
+            offsets_flat[ii * s + j] = offsets[ii][j];
         }
     }
     /// Display offset matrix
@@ -139,140 +153,13 @@ int main(int argc, char* argv[]) {
     printSolution(solution, offsets, instances[0].oligs, s, s - 30);
     printf("\r\n\n\n");
     
-    /// Simple Tabu Search from one of the vertices
-
-    int tabuCount = 0;
-    int tabuId = 0;
-    int tabuLimit = 1000; // number of fragments in tabu list
-    int tabuFragmentLength = 5; // length of tabu fragments
-    std::vector<std::vector<int>> tabuFragments(tabuLimit, std::vector<int>(tabuFragmentLength));
-    
-    // populating tabu list
-    for (int j = 0; j < s/tabuFragmentLength; j++) {
-        for (int k = 0; k < tabuFragmentLength; k++) {
-            tabuFragments[j][k] = solution[tabuFragmentLength * j + k];
-        }
-        tabuCount++;
-        tabuId++;
-    }
-    
-    // modifying previus solution considering tabu list
-    for (int u = 0; u < 10; u++) {
-
-        int* prevSolution = new int[s];
-        prevSolution = solution;
-        std::vector<int> infringementFragments;
-        std::vector<int> infringementId;
-        int infringementCount = 0;
-        bool* used = new bool[s] {};
-        used[solution[0]] = true;
-        for (int j = 1; j < s; j++) {
-            int bestLimit = 10;
-            int* best = new int[bestLimit] {};
-            int bestCount = 0;
-            for (int k = 0; k < s; k++) {
-                if (used[k]) continue;
-                int id = bestCount;
-                int b = bestCount - 1;
-                while (b >= 0 && offsets[solution[j - 1]][k] < offsets[solution[j - 1]][best[b]])
-                    id = b--;
-                if (id < bestCount || bestCount < bestLimit) {
-                    for (int ll = bestCount - 1; ll > id; ll--)
-                        best[ll] = best[ll - 1];
-                    best[id] = k;
-                    if (bestCount < bestLimit) bestCount++;
-                }
-            }
-            //for (int k = 0; k < bestCount; k++) {
-            //    printf("%s --%d--> %s\n", toChar(instances[0].oligs[solution[j - 1]]), offsets[solution[j - 1]][best[k]], toChar(instances[0].oligs[best[k]]));
-            //}
-            // Check the tabu lists
-            int seed = solution[((int)(1000 * sqrt(109 + j * j))) % s];
-            // if (seed % 10 == 0) printf("X"); else printf("_"); // does look pretty randomized
-            bool chosen = false;
-            for (int k = 0; k < bestCount; k++) {
-                int probModulo = 0;
-                for (int kk = 0; kk < infringementCount; kk++) {
-                    infringementId[kk] += (infringementId[kk] < tabuFragmentLength - 1) ? 1 : 0;
-                    if (tabuFragments[infringementFragments[kk]][infringementId[kk]] == best[k]) {
-                        probModulo = tabuFragmentLength - infringementId[kk];
-                        if (seed % probModulo == 0) {
-                            solution[j] = best[k];
-                            used[best[k]] = true;
-                        }
-                        break;
-                    }
-                }
-                if (probModulo == 0 && infringementCount > 0) {
-                    infringementFragments.clear();
-                    infringementId.clear();
-                    infringementCount = 0;
-                }
-
-                if (seed % tabuFragmentLength == 0) {
-                    solution[j] = best[k];
-                    used[best[k]] = true;
-                }
-                // adding new infringements
-                bool infringing = false;
-                for (int kk = 0; kk < tabuCount; kk++)
-                    if (tabuFragments[kk][0] == best[k]) {
-                        if (used[best[k]]) {
-                            infringementFragments.push_back(k);
-                            infringementId.push_back(0);
-                            infringementCount++;
-                        }
-                        else {
-                            infringing = true;
-                            break;
-                        }
-                    }
-                if (!infringing) {
-                    solution[j] = best[k];
-                    used[best[k]] = true;
-                }
-                if (used[best[k]]) {
-                    printf("%d", k);
-                    chosen = true;
-                    break;
-                }
-            }
-            if (!chosen) {
-                // fallback (greedy):
-                solution[j] = best[0];
-                used[best[0]] = true;
-            }
-        }
-        // updating the tabu list
-        printf("TabuCount: %d\n", tabuCount);
-        for (int j = 0; j < s / tabuFragmentLength; j++) {
-            for (int k = 0; k < tabuFragmentLength; k++) {
-                printf("_%d", tabuCount);
-                tabuFragments[tabuId++ % tabuCount][k] = solution[tabuFragmentLength * j + k];
-            }
-            if (tabuCount < tabuLimit) tabuCount++;
-        }
-        // evaluating the solution
-        for (int j = 0; j < s; j++) {
-
-        }
-
-        printf("Solution for %s: (press any key to continue)\n", toChar(instances[0].oligs[solution[0]]));
-        getchar();
-        printSolution(solution, offsets, instances[0].oligs, 100);
-        printf("\t\t\t . . .\r\n\n\n");
-        printSolution(solution, offsets, instances[0].oligs, s / 2 + 80, s / 2);
-        printf("\t\t\t . . .\r\n\n\n");
-        printSolution(solution, offsets, instances[0].oligs, s, s - 30);
-        printf("\r\n\n\n");
-
-    }
+    // Tabu Search
 
     /// Cleanup
-    for (int j = 0; j < s; ++j) { delete[] greedy[j]; }
+    /*for (int j = 0; j < s; ++j) { delete[] greedy[j]; }
     delete[] greedy;
     for (int j = 0; j < s; ++j) { delete[] offsets[j]; }
-    delete[] offsets;
+    delete[] offsets;*/
 
     printf("\n\n\n");
     /////////////////////////////////////////////////////////////////
@@ -296,6 +183,42 @@ int main(int argc, char* argv[]) {
         printf("no CUDA capable devices were detected\n");
         return 1;
     }
+
+    ///// Running Tabu search on CUDA
+    int* d_solution = 0;
+    int* d_offsets = nullptr; // will store a flattened version of offsets
+
+    //int* sub_a = a + cpu_thread_id * n / num_cpu_threads;  // pointer to this CPU thread's portion of data
+
+
+    dim3 threads(1);  // number of threads per block
+    dim3 blocks(1);
+    unsigned int solution_size = s * sizeof(int);
+    unsigned int offsets_size = s * s * sizeof(int);
+
+    /*for (int i = 0; i < n; i++)
+        printf("%d\t", a[i]);*/
+    cudaMalloc((void**)&d_solution, solution_size);
+    cudaMalloc((void**)&d_offsets, offsets_size);
+
+    //cudaMemset(d_solution, 0, solution_size);
+    
+    cudaMemcpy(d_solution, solution, solution_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_offsets, offsets_flat, offsets_size, cudaMemcpyHostToDevice);
+    checkCudaErrors();
+    
+
+    kernelTabuSearch <<<blocks, threads>>> (d_solution, d_offsets, s, oligs_flat);
+    checkCudaErrors();
+    cudaMemcpy(solution, d_solution, solution_size, cudaMemcpyDeviceToHost);
+    
+    cudaFree(d_solution);
+    cudaFree(d_offsets);
+
+
+    checkCudaErrors();
+    printf("Finished!");
+    exit(0);
 
     /////////////////////////////////////////////////////////////////
     // display CPU and GPU configuration
