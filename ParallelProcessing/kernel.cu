@@ -57,7 +57,8 @@ __global__ void kernelTabuSearch(
 ) {
     /// Simple Tabu Search from one of the vertices
     printf("+----- KernelTabuSearch -----+\r\n\n");
-    printf("s: %d,\r\n", s);
+    printf("s: %d, tabuLimit: %d, tabuFragmentLength: %d, tabuCount: %d, tabuId %d,\r\n",
+        s, tabuLimit, tabuFragmentLength, *tabuCount, *tabuId);
     // populating tabu list (for the first iteration)
     if (*tabuCount == 0) {
         printf("populating tabu list\r\n");
@@ -74,8 +75,11 @@ __global__ void kernelTabuSearch(
 
 
     // modifying previus solution considering tabu list
+    // this is for debug purpouses, the actual algorythm works on 'solution' in place
     int* prevSolution = new int[s];
-    prevSolution = solution;
+    for (int i = 0; i < s; i++) {
+        prevSolution[i] = solution[i];
+    }
     int infrCount = 0;
     int infrLimit = 0;
     int* infringementFragments = new int[infrLimit];
@@ -106,7 +110,8 @@ __global__ void kernelTabuSearch(
         //    printf("%s --%d--> %s\n", toChar(instances[0].oligs[solution[j - 1]]), offsets[solution[j - 1]][best[k]], toChar(instances[0].oligs[best[k]]));
         //}
         // Check the tabu lists
-        int seed = solution[((int)(1000 * sqrtf(109 + j * j))) % s];
+        int seed = (int)((float)j / 17 * 1000) + solution[(((*tabuId + int(logf(j + 104) * 1000))) % (*tabuCount + 1)) * (j % tabuFragmentLength + 1)];
+        // printf("seed: %d <-- %d, %d\n", seed, (int)((float)j/17*1000), solution[(((*tabuId + int(logf(j+104)*1000))) % (*tabuCount+1)) * (j % tabuFragmentLength + 1)]);
         // if (seed % 10 == 0) printf("X"); else printf("_"); // does look pretty randomized
         bool chosen = false;
         for (int k = 0; k < bestCount; k++) {
@@ -171,8 +176,21 @@ __global__ void kernelTabuSearch(
         if (*tabuCount < tabuLimit) *tabuCount += 1;
     }
     // evaluating the solution
-    /*int cost = 0;
-    for (int j = 1; j < s; j++) { cost += offsets[(j - 1) * s + j]; }*/
+    int cost = 0;
+    for (int j = 1; j < s; j++) { cost += offsets[(j - 1) * s + j]; }
+    int changed_from_prev = 0;
+    for (int j = 1; j < s; j++) {
+        if (solution[j] != prevSolution[j]) {
+            changed_from_prev++;
+            printf("\n%d: \t %d --> %d\t\t", j, prevSolution[j], solution[j]);
+            for (int i = 0; i < 10; i++) printf("%c", oligs_flat[prevSolution[j] * 10 + i]);
+            printf(" --> ");
+            for (int i = 0; i < 10; i++) printf("%c", oligs_flat[solution[j] * 10 + i]);
+            if (changed_from_prev > 30) break;
+        }
+    }
+
+    printf("\n\nCost of new solution: %d, oligs that are on different positions: %d", cost, changed_from_prev);
 
     /*printf("\nSolution for ");
     for (int i = 0; i < 10; i++) printf("%c", oligs_flat[i]);

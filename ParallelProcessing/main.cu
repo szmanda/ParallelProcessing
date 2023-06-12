@@ -195,7 +195,7 @@ int main(int argc, char* argv[]) {
 
     //int* sub_a = a + cpu_thread_id * n / num_cpu_threads;  // pointer to this CPU thread's portion of data
 
-    int local_tabu_limit = 500;
+    int local_tabu_limit = 2000;
     int local_tabu_fragment_length = 5;
 
 
@@ -226,7 +226,7 @@ int main(int argc, char* argv[]) {
     checkCudaErrors();
     
     // cudaDeviceSetLimit(cudaLimitDevRuntimeSyncDepth, 20);
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 5; i++) {
         kernelTabuSearch <<< blocks, threads >>> (
             d_solution,
             d_offsets,
@@ -242,6 +242,15 @@ int main(int argc, char* argv[]) {
         printf("\nkernel %d completed. ", i);
         checkCudaErrors();
         printf("\n");
+        printf("copied a solution back to host:");
+        cudaMemcpy(solution, d_solution, solution_size, cudaMemcpyDeviceToHost);
+        checkCudaErrors();
+        printSolution(solution, offsets, instances[0].oligs, 100);
+        printf("\t\t\t . . .\n\n\n");
+        printSolution(solution, offsets, instances[0].oligs, s / 2 + 80, s / 2);
+        printf("\t\t\t . . .\n\n\n");
+        printSolution(solution, offsets, instances[0].oligs, s, s - 30);
+        printf("\r\n\n\n");
     }
     checkCudaErrors();
     cudaMemcpy(solution, d_solution, solution_size, cudaMemcpyDeviceToHost);
