@@ -17,6 +17,7 @@ __global__ void kernelTabuSearch(
     int* solution,
     int* offsets,
     const int s,
+    const int n, // number of oligs to be considered as a solution, used in evaluation
     char* oligs_flat, // usefull for debug
     int* tabuFragments, // [tabuLimit * TabuFragmentLength]
     int tabuLimit, // number of fragments in tabu list

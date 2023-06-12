@@ -48,6 +48,7 @@ __global__ void kernelTabuSearch(
     int* solution,
     int *offsets,
     const int s,
+    const int n,
     char* oligs_flat,
     int* tabuFragments, // [tabuLimit * TabuFragmentLength]
     int tabuLimit, // number of fragments in tabu list
@@ -175,11 +176,11 @@ __global__ void kernelTabuSearch(
         }
         if (*tabuCount < tabuLimit) *tabuCount += 1;
     }
-    // evaluating the solution
+    // evaluating the solution (first n oligs)
     int cost = 0;
-    for (int j = 1; j < s; j++) { cost += offsets[(j - 1) * s + j]; }
+    for (int j = 1; j < n; j++) { cost += offsets[(j - 1) * s + j]; }
     int changed_from_prev = 0;
-    for (int j = 1; j < s; j++) {
+    for (int j = 1; j < n; j++) {
         if (solution[j] != prevSolution[j]) {
             changed_from_prev++;
             printf("\n%d: \t %d --> %d\t\t", j, prevSolution[j], solution[j]);

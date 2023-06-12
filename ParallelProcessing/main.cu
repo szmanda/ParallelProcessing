@@ -231,6 +231,7 @@ int main(int argc, char* argv[]) {
             d_solution,
             d_offsets,
             s,
+            instances[i].n,
             d_oligs_flat,
             d_tabu_fragments,
             local_tabu_limit,
