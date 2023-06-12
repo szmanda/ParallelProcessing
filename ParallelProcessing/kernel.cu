@@ -44,135 +44,147 @@ __device__ void printSolution(int* solution, int* offsets_flat, int s, char* oli
     printf("\n\n");
 }
 
-__global__ void kernelTabuSearch(int* solution, int *offsets, const int s, char* oligs_flat) {
+__global__ void kernelTabuSearch(
+    int* solution,
+    int *offsets,
+    const int s,
+    char* oligs_flat,
+    int* tabuFragments, // [tabuLimit * TabuFragmentLength]
+    int tabuLimit, // number of fragments in tabu list
+    int tabuFragmentLength, // length of tabu fragments
+    int* tabuCount,
+    int* tabuId
+) {
     /// Simple Tabu Search from one of the vertices
-    printf("+----- KernelTabuSearch -----+\n\n");
-
-    int tabuCount = 0;
-    int tabuId = 0;
-    int tabuLimit = 1000; // number of fragments in tabu list
-    int tabuFragmentLength = 5; // length of tabu fragments
-    int** tabuFragments = new int* [tabuLimit];
-    for (int i = 0; i < tabuLimit; i++) tabuFragments[i] = new int[tabuFragmentLength];
-
-    // populating tabu list
-    for (int j = 0; j < s / tabuFragmentLength; j++) {
-        for (int k = 0; k < tabuFragmentLength; k++) {
-            tabuFragments[j][k] = solution[tabuFragmentLength * j + k];
+    printf("+----- KernelTabuSearch -----+\r\n\n");
+    printf("s: %d,\r\n", s);
+    // populating tabu list (for the first iteration)
+    if (*tabuCount == 0) {
+        printf("populating tabu list\r\n");
+        for (int j = 0; j < s / tabuFragmentLength; j++) {
+            for (int k = 0; k < tabuFragmentLength; k++) {
+                tabuFragments[j * tabuFragmentLength + k] = solution[tabuFragmentLength * j + k];
+            }
+            *tabuCount += 1;
+            *tabuId += 1;
         }
-        tabuCount++;
-        tabuId++;
     }
+    
+    printf("\n");
+
 
     // modifying previus solution considering tabu list
-    for (int u = 0; u < 1; u++) {
-
-        int* prevSolution = new int[s];
-        prevSolution = solution;
-        int infrCount = 0;
-        int infrLimit = 0;
-        int* infringementFragments = new int[infrLimit];
-        int* infringementId = new int[infrLimit];
-        bool* used = new bool[s] {};
-        used[solution[0]] = true;
-        for (int j = 1; j < s; j++) {
-            int bestLimit = 10;
-            int* best = new int[bestLimit] {};
-            int bestCount = 0;
-            for (int k = 0; k < s; k++) {
-                if (used[k]) continue;
-                int id = bestCount;
-                int b = bestCount - 1;
-                while (b >= 0 && offsets[solution[j - 1] * s + k] < offsets[solution[j - 1] * s + best[b]])
-                    id = b--;
-                if (id < bestCount || bestCount < bestLimit) {
-                    for (int ll = bestCount - 1; ll > id; ll--)
-                        best[ll] = best[ll - 1];
-                    best[id] = k;
-                    if (bestCount < bestLimit) bestCount++;
-                }
+    int* prevSolution = new int[s];
+    prevSolution = solution;
+    int infrCount = 0;
+    int infrLimit = 0;
+    int* infringementFragments = new int[infrLimit];
+    int* infringementId = new int[infrLimit];
+    bool* used = new bool[s] {};
+    used[solution[0]] = true;
+    for (int j = 1; j < s; j++) {
+        int bestLimit = 10;
+        int* best = new int[bestLimit] {};
+        int bestCount = 0;
+        for (int k = 0; k < s; k++) {
+            if (used[k]) continue;
+            int id = bestCount;
+            int b = bestCount - 1;
+            while (b >= 0 && offsets[solution[j - 1] * s + k] < offsets[solution[j - 1] * s + best[b]])
+                id = b--;
+            if (id < bestCount || bestCount < bestLimit) {
+                for (int ll = bestCount - 1; ll > id; ll--)
+                    best[ll] = best[ll - 1];
+                best[id] = k;
+                if (bestCount < bestLimit) bestCount++;
             }
-            //for (int k = 0; k < bestCount; k++) {
-            //    printf("%s --%d--> %s\n", toChar(instances[0].oligs[solution[j - 1]]), offsets[solution[j - 1]][best[k]], toChar(instances[0].oligs[best[k]]));
-            //}
-            // Check the tabu lists
-            int seed = solution[((int)(1000 * sqrtf(109 + j * j))) % s];
-            // if (seed % 10 == 0) printf("X"); else printf("_"); // does look pretty randomized
-            bool chosen = false;
-            for (int k = 0; k < bestCount; k++) {
-                int probModulo = 0;
-                for (int kk = 0; kk < infrCount; kk++) {
-                    infringementId[kk] += (infringementId[kk] < tabuFragmentLength - 1) ? 1 : 0;
-                    if (tabuFragments[infringementFragments[kk]][infringementId[kk]] == best[k]) {
-                        probModulo = tabuFragmentLength - infringementId[kk];
-                        if (seed % probModulo == 0) {
-                            solution[j] = best[k];
-                            used[best[k]] = true;
-                        }
-                        break;
+        }
+        if (bestCount == 0) {
+            printf("ERR: did not find any best solutions!!! that's dangerous");
+        }
+        //for (int k = 0; k < bestCount; k++) {
+        //    printf("%s --%d--> %s\n", toChar(instances[0].oligs[solution[j - 1]]), offsets[solution[j - 1]][best[k]], toChar(instances[0].oligs[best[k]]));
+        //}
+        // Check the tabu lists
+        int seed = solution[((int)(1000 * sqrtf(109 + j * j))) % s];
+        // if (seed % 10 == 0) printf("X"); else printf("_"); // does look pretty randomized
+        bool chosen = false;
+        for (int k = 0; k < bestCount; k++) {
+            int probModulo = 0;
+            for (int kk = 0; kk < infrCount; kk++) {
+                infringementId[kk] += (infringementId[kk] < tabuFragmentLength - 1) ? 1 : 0;
+                if (tabuFragments[infringementFragments[kk] * tabuFragmentLength + infringementId[kk]] == best[k]) {
+                    probModulo = tabuFragmentLength - infringementId[kk];
+                    if (seed % probModulo == 0) {
+                        solution[j] = best[k];
+                        used[best[k]] = true;
                     }
-                }
-                if (probModulo == 0 && infrCount > 0) {
-                    infrCount = 0;
-                }
-
-                if (seed % tabuFragmentLength == 0) {
-                    solution[j] = best[k];
-                    used[best[k]] = true;
-                }
-                // adding new infringements
-                bool infringing = false;
-                for (int kk = 0; kk < tabuCount; kk++)
-                    if (tabuFragments[kk][0] == best[k]) {
-                        if (used[best[k]] && infrCount < infrLimit) {
-                            infringementFragments[infrCount] = k;
-                            infringementId[infrCount] = 0;
-                            infrCount++;
-                        }
-                        else {
-                            infringing = true;
-                            break;
-                        }
-                    }
-                if (!infringing) {
-                    solution[j] = best[k];
-                    used[best[k]] = true;
-                }
-                if (used[best[k]]) {
-                    printf("%d", k);
-                    chosen = true;
                     break;
                 }
             }
-            if (!chosen) {
-                // fallback (greedy):
-                solution[j] = best[0];
-                used[best[0]] = true;
+            if (probModulo == 0 && infrCount > 0) {
+                infrCount = 0;
+            }
+
+            if (seed % tabuFragmentLength == 0) {
+                solution[j] = best[k];
+                used[best[k]] = true;
+            }
+            // adding new infringements
+            bool infringing = false;
+            for (int kk = 0; kk < *tabuCount; kk++)
+                if (tabuFragments[kk * tabuFragmentLength + 0] == best[k]) {
+                    if (used[best[k]] && infrCount < infrLimit) {
+                        infringementFragments[infrCount] = k;
+                        infringementId[infrCount] = 0;
+                        infrCount++;
+                    }
+                    else {
+                        infringing = true;
+                        break;
+                    }
+                }
+            if (!infringing) {
+                solution[j] = best[k];
+                used[best[k]] = true;
+            }
+            if (used[best[k]]) {
+                printf("%d", k);
+                chosen = true;
+                break;
             }
         }
-        // updating the tabu list
-        printf("TabuCount: %d\n", tabuCount);
-        for (int j = 0; j < s / tabuFragmentLength; j++) {
-            for (int k = 0; k < tabuFragmentLength; k++) {
-                printf("_%d", tabuCount);
-                tabuFragments[tabuId++ % tabuCount][k] = solution[tabuFragmentLength * j + k];
-            }
-            if (tabuCount < tabuLimit) tabuCount++;
+        if (!chosen) {
+            //printf("Fallback greedy\n");
+            printf("_");
+            solution[j] = best[0];
+            used[best[0]] = true;
         }
-        // evaluating the solution
-        int cost = 0;
-        for (int j = 1; j < s; j++) { cost += offsets[(j - 1) * s + j]; }
-
-        printf("\nSolution for ");
-        for (int i = 0; i < 10; i++) printf("%c", oligs_flat[i]);
-        printf("\n\n");
-        printSolution(solution, offsets, s, oligs_flat, 100);
-        printf("\t\t\t . . .\r\n\n\n");
-        printSolution(solution, offsets, s, oligs_flat, s / 2 + 80, s / 2);
-        printf("\t\t\t . . .\r\n\n\n");
-        printSolution(solution, offsets, s, oligs_flat, s, s - 30);
-        printf("\r\n\n\n");
-
     }
+    // updating the tabu list
+    printf("\nTabuCount: %d, now adding new entries:\n", *tabuCount);
+    for (int j = 0; j < s / tabuFragmentLength; j++) {
+        printf("_%d", *tabuCount);
+        for (int k = 0; k < tabuFragmentLength; k++) {
+            tabuFragments[(*tabuId++ % *tabuCount) * tabuFragmentLength + k] = solution[tabuFragmentLength * j + k];
+        }
+        if (*tabuCount < tabuLimit) *tabuCount += 1;
+    }
+    // evaluating the solution
+    /*int cost = 0;
+    for (int j = 1; j < s; j++) { cost += offsets[(j - 1) * s + j]; }*/
+
+    /*printf("\nSolution for ");
+    for (int i = 0; i < 10; i++) printf("%c", oligs_flat[i]);
+    printf("\n\n");
+    printSolution(solution, offsets, s, oligs_flat, 100);
+    printf("\t\t\t . . .\r\n\n\n");
+    printSolution(solution, offsets, s, oligs_flat, s / 2 + 80, s / 2);
+    printf("\t\t\t . . .\r\n\n\n");
+    printSolution(solution, offsets, s, oligs_flat, s, s - 30);
+    printf("\r\n\n\n");*/
+
+    //printf("%s\n", oligs_flat);
+
     printf("\n\n+----- Exiting KernelTabuSearch ------+\n\n");
 }

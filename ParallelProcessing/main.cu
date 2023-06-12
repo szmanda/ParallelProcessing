@@ -89,10 +89,10 @@ int main(int argc, char* argv[]) {
             }
         }
     }
-    char* oligs_flat = new char[s * s];
+    char* oligs_flat = new char[s * l];
     for (int ii = 0; ii < s; ii++) {
-        char* olig = toChar(instances[i].oligs[i]);
-        for (int j = 0; j < s; j++) {
+        char* olig = toChar(instances[i].oligs[ii]);
+        for (int j = 0; j < l; j++) {
             oligs_flat[ii * l + j] = olig[j];
         }
     }
@@ -186,26 +186,39 @@ int main(int argc, char* argv[]) {
 
     ///// Running Tabu search on CUDA
 
-    int* d_solution = 0;
+    int* d_solution = nullptr;
     int* d_offsets = nullptr; // will store a flattened version of offsets
     char* d_oligs_flat = nullptr;
+    int* d_tabu_fragments = nullptr;
+    int* d_tabu_count = nullptr;
+    int* d_tabu_id = nullptr;
 
     //int* sub_a = a + cpu_thread_id * n / num_cpu_threads;  // pointer to this CPU thread's portion of data
+
+    int local_tabu_limit = 500;
+    int local_tabu_fragment_length = 5;
 
 
     dim3 threads(1);  // number of threads per block
     dim3 blocks(1);
     unsigned int solution_size = s * sizeof(int);
     unsigned int offsets_size = s * s * sizeof(int);
-    unsigned int oligs_flat_size = s * s * sizeof(char);
+    unsigned int oligs_flat_size = s * l * sizeof(char);
+    unsigned int tabu_fragments_size = local_tabu_limit * local_tabu_fragment_length * sizeof(int);
+    unsigned int tabu_count_size = sizeof(int);
+    unsigned int tabu_id_size = sizeof(int);
 
     /*for (int i = 0; i < n; i++)
         printf("%d\t", a[i]);*/
     cudaMalloc((void**)&d_solution, solution_size);
     cudaMalloc((void**)&d_offsets, offsets_size);
     cudaMalloc((void**)&d_oligs_flat, oligs_flat_size);
+    cudaMalloc((void**)&d_tabu_fragments, tabu_fragments_size);
+    cudaMalloc((void**)&d_tabu_count, tabu_count_size);
+    cudaMalloc((void**)&d_tabu_id, tabu_id_size);
 
-    //cudaMemset(d_solution, 0, solution_size);
+    cudaMemset(d_tabu_count, 0, tabu_count_size);
+    cudaMemset(d_tabu_id, 0, tabu_id_size);
     
     cudaMemcpy(d_solution, solution, solution_size, cudaMemcpyHostToDevice);
     cudaMemcpy(d_offsets, offsets_flat, offsets_size, cudaMemcpyHostToDevice);
@@ -214,7 +227,21 @@ int main(int argc, char* argv[]) {
     
     // cudaDeviceSetLimit(cudaLimitDevRuntimeSyncDepth, 20);
     for (int i = 0; i < 10; i++) {
-        kernelTabuSearch <<< blocks, threads >>> (d_solution, d_offsets, s, d_oligs_flat);
+        kernelTabuSearch <<< blocks, threads >>> (
+            d_solution,
+            d_offsets,
+            s,
+            d_oligs_flat,
+            d_tabu_fragments,
+            local_tabu_limit,
+            local_tabu_fragment_length,
+            d_tabu_count,
+            d_tabu_id
+        );
+        cudaDeviceSynchronize();
+        printf("\nkernel %d completed. ", i);
+        checkCudaErrors();
+        printf("\n");
     }
     checkCudaErrors();
     cudaMemcpy(solution, d_solution, solution_size, cudaMemcpyDeviceToHost);
