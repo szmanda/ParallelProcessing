@@ -65,7 +65,7 @@ __global__ void kernelTabuSearch(int* solution, int *offsets, const int s, char*
     }
 
     // modifying previus solution considering tabu list
-    for (int u = 0; u < 5; u++) {
+    for (int u = 0; u < 1; u++) {
 
         int* prevSolution = new int[s];
         prevSolution = solution;
@@ -163,14 +163,15 @@ __global__ void kernelTabuSearch(int* solution, int *offsets, const int s, char*
         int cost = 0;
         for (int j = 1; j < s; j++) { cost += offsets[(j - 1) * s + j]; }
 
-        /*printf("Solution for %s: (press any key to continue)\n", toChar(instance.oligs[solution[0]]));
-        getchar();
-        printSolution(solution, offsets, s, instance.oligs, 100);
+        printf("\nSolution for ");
+        for (int i = 0; i < 10; i++) printf("%c", oligs_flat[i]);
+        printf("\n\n");
+        printSolution(solution, offsets, s, oligs_flat, 100);
         printf("\t\t\t . . .\r\n\n\n");
-        printSolution(solution, offsets, s, instance.oligs, s / 2 + 80, s / 2);
+        printSolution(solution, offsets, s, oligs_flat, s / 2 + 80, s / 2);
         printf("\t\t\t . . .\r\n\n\n");
-        printSolution(solution, offsets, s, instance.oligs, s, s - 30);
-        printf("\r\n\n\n");*/
+        printSolution(solution, offsets, s, oligs_flat, s, s - 30);
+        printf("\r\n\n\n");
 
     }
     printf("\n\n+----- Exiting KernelTabuSearch ------+\n\n");

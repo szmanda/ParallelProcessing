@@ -185,8 +185,10 @@ int main(int argc, char* argv[]) {
     }
 
     ///// Running Tabu search on CUDA
+
     int* d_solution = 0;
     int* d_offsets = nullptr; // will store a flattened version of offsets
+    char* d_oligs_flat = nullptr;
 
     //int* sub_a = a + cpu_thread_id * n / num_cpu_threads;  // pointer to this CPU thread's portion of data
 
@@ -195,20 +197,25 @@ int main(int argc, char* argv[]) {
     dim3 blocks(1);
     unsigned int solution_size = s * sizeof(int);
     unsigned int offsets_size = s * s * sizeof(int);
+    unsigned int oligs_flat_size = s * s * sizeof(char);
 
     /*for (int i = 0; i < n; i++)
         printf("%d\t", a[i]);*/
     cudaMalloc((void**)&d_solution, solution_size);
     cudaMalloc((void**)&d_offsets, offsets_size);
+    cudaMalloc((void**)&d_oligs_flat, oligs_flat_size);
 
     //cudaMemset(d_solution, 0, solution_size);
     
     cudaMemcpy(d_solution, solution, solution_size, cudaMemcpyHostToDevice);
     cudaMemcpy(d_offsets, offsets_flat, offsets_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_oligs_flat, oligs_flat, oligs_flat_size, cudaMemcpyHostToDevice);
     checkCudaErrors();
     
-
-    kernelTabuSearch <<<blocks, threads>>> (d_solution, d_offsets, s, oligs_flat);
+    // cudaDeviceSetLimit(cudaLimitDevRuntimeSyncDepth, 20);
+    for (int i = 0; i < 10; i++) {
+        kernelTabuSearch <<< blocks, threads >>> (d_solution, d_offsets, s, d_oligs_flat);
+    }
     checkCudaErrors();
     cudaMemcpy(solution, d_solution, solution_size, cudaMemcpyDeviceToHost);
     
