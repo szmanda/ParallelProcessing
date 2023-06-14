@@ -15,13 +15,14 @@ __device__ void printSolution(int* solution, int* offsets_flat, int s, char* oli
 
 __global__ void kernelTabuSearch(
     int* solution,
-    int* offsets,
+    const int* offsets,
     const int s,
     const int n, // number of oligs to be considered as a solution, used in evaluation
-    char* oligs_flat, // usefull for debug
+    const char* oligs_flat, // usefull for debug
     int* tabuFragments, // [tabuLimit * TabuFragmentLength]
-    int tabuLimit, // number of fragments in tabu list
-    int tabuFragmentLength, // length of tabu fragments
+    const int tabuLimit, // number of fragments in tabu list
+    const int tabuFragmentLength, // length of tabu fragments
     int* tabuCount,
-    int* tabuId
+    int* tabuId,
+    bool* used
 );

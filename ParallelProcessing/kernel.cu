@@ -46,20 +46,21 @@ __device__ void printSolution(int* solution, int* offsets_flat, int s, char* oli
 
 __global__ void kernelTabuSearch(
     int* solution,
-    int *offsets,
+    const int* offsets,
     const int s,
     const int n,
-    char* oligs_flat,
+    const char* oligs_flat,
     int* tabuFragments, // [tabuLimit * TabuFragmentLength]
-    int tabuLimit, // number of fragments in tabu list
-    int tabuFragmentLength, // length of tabu fragments
+    const int tabuLimit, // number of fragments in tabu list
+    const int tabuFragmentLength, // length of tabu fragments
     int* tabuCount,
-    int* tabuId
+    int* tabuId,
+    bool* used
 ) {
     /// Simple Tabu Search from one of the vertices
     printf("+----- KernelTabuSearch -----+\r\n\n");
-    printf("s: %d, tabuLimit: %d, tabuFragmentLength: %d, tabuCount: %d, tabuId %d,\r\n",
-        s, tabuLimit, tabuFragmentLength, *tabuCount, *tabuId);
+    printf("s: %d, n: %d, tabuLimit: %d, tabuFragmentLength: %d, tabuCount: %d, tabuId %d,\r\n",
+        s, n, tabuLimit, tabuFragmentLength, *tabuCount, *tabuId);
     // populating tabu list (for the first iteration)
     if (*tabuCount == 0) {
         printf("populating tabu list\r\n");
@@ -77,19 +78,20 @@ __global__ void kernelTabuSearch(
 
     // modifying previus solution considering tabu list
     // this is for debug purpouses, the actual algorythm works on 'solution' in place
-    int* prevSolution = new int[s];
-    for (int i = 0; i < s; i++) {
+    // int prevSolution[1000];
+    /*for (int i = 0; i < s; i++) {
         prevSolution[i] = solution[i];
-    }
+    }*/
     int infrCount = 0;
-    int infrLimit = 0;
-    int* infringementFragments = new int[infrLimit];
-    int* infringementId = new int[infrLimit];
-    bool* used = new bool[s] {};
+    const int infrLimit = 10;
+    int infringementFragments[infrLimit];
+    int infringementId[infrLimit];
+    //bool* used = new bool[s] {};
     used[solution[0]] = true;
     for (int j = 1; j < s; j++) {
-        int bestLimit = 10;
-        int* best = new int[bestLimit] {};
+        const int bestLimit = 10;
+        //int* best = new int[bestLimit] {};
+        int best[bestLimit];
         int bestCount = 0;
         for (int k = 0; k < s; k++) {
             if (used[k]) continue;
@@ -121,7 +123,7 @@ __global__ void kernelTabuSearch(
                 infringementId[kk] += (infringementId[kk] < tabuFragmentLength - 1) ? 1 : 0;
                 if (tabuFragments[infringementFragments[kk] * tabuFragmentLength + infringementId[kk]] == best[k]) {
                     probModulo = tabuFragmentLength - infringementId[kk];
-                    if (seed % probModulo == 0) {
+                    if (probModulo > 0 && seed % probModulo == 0) {
                         solution[j] = best[k];
                         used[best[k]] = true;
                     }
@@ -154,6 +156,7 @@ __global__ void kernelTabuSearch(
                 solution[j] = best[k];
                 used[best[k]] = true;
             }
+            chosen = true;
             if (used[best[k]]) {
                 printf("%d", k);
                 chosen = true;
@@ -166,6 +169,8 @@ __global__ void kernelTabuSearch(
             solution[j] = best[0];
             used[best[0]] = true;
         }
+
+        delete[] best;
     }
     // updating the tabu list
     printf("\nTabuCount: %d, now adding new entries:\n", *tabuCount);
@@ -178,9 +183,10 @@ __global__ void kernelTabuSearch(
     }
     // evaluating the solution (first n oligs)
     int cost = 0;
-    for (int j = 1; j < n; j++) { cost += offsets[(j - 1) * s + j]; }
+    int nn = n < s ? n : s;
+    for (int j = 1; j < nn; j++) { cost += offsets[(j - 1) * s + j]; }
     int changed_from_prev = 0;
-    for (int j = 1; j < n; j++) {
+    /*for (int j = 1; j < nn; j++) {
         if (solution[j] != prevSolution[j]) {
             changed_from_prev++;
             printf("\n%d: \t %d --> %d\t\t", j, prevSolution[j], solution[j]);
@@ -189,7 +195,7 @@ __global__ void kernelTabuSearch(
             for (int i = 0; i < 10; i++) printf("%c", oligs_flat[solution[j] * 10 + i]);
             if (changed_from_prev > 30) break;
         }
-    }
+    }*/
 
     printf("\n\nCost of new solution: %d, oligs that are on different positions: %d", cost, changed_from_prev);
 
@@ -204,6 +210,11 @@ __global__ void kernelTabuSearch(
     printf("\r\n\n\n");*/
 
     //printf("%s\n", oligs_flat);
+
+    // delete[] prevSolution;
+    delete[] infringementFragments;
+    delete[] infringementId;
+    //delete[] used;
 
     printf("\n\n+----- Exiting KernelTabuSearch ------+\n\n");
 }

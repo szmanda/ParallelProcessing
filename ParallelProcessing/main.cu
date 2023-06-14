@@ -192,6 +192,7 @@ int main(int argc, char* argv[]) {
     int* d_tabu_fragments = nullptr;
     int* d_tabu_count = nullptr;
     int* d_tabu_id = nullptr;
+    bool* d_used = nullptr;
 
     //int* sub_a = a + cpu_thread_id * n / num_cpu_threads;  // pointer to this CPU thread's portion of data
 
@@ -207,6 +208,7 @@ int main(int argc, char* argv[]) {
     unsigned int tabu_fragments_size = local_tabu_limit * local_tabu_fragment_length * sizeof(int);
     unsigned int tabu_count_size = sizeof(int);
     unsigned int tabu_id_size = sizeof(int);
+    unsigned int used_size = s* sizeof(bool);
 
     /*for (int i = 0; i < n; i++)
         printf("%d\t", a[i]);*/
@@ -216,6 +218,7 @@ int main(int argc, char* argv[]) {
     cudaMalloc((void**)&d_tabu_fragments, tabu_fragments_size);
     cudaMalloc((void**)&d_tabu_count, tabu_count_size);
     cudaMalloc((void**)&d_tabu_id, tabu_id_size);
+    cudaMalloc((void**)&d_used, used_size);
 
     cudaMemset(d_tabu_count, 0, tabu_count_size);
     cudaMemset(d_tabu_id, 0, tabu_id_size);
@@ -227,6 +230,7 @@ int main(int argc, char* argv[]) {
     
     // cudaDeviceSetLimit(cudaLimitDevRuntimeSyncDepth, 20);
     for (int i = 0; i < 5; i++) {
+        cudaMemset(d_used, 0, used_size);
         kernelTabuSearch <<< blocks, threads >>> (
             d_solution,
             d_offsets,
@@ -237,13 +241,13 @@ int main(int argc, char* argv[]) {
             local_tabu_limit,
             local_tabu_fragment_length,
             d_tabu_count,
-            d_tabu_id
+            d_tabu_id,
+            d_used
         );
         cudaDeviceSynchronize();
         printf("\nkernel %d completed. ", i);
-        checkCudaErrors();
-        printf("\n");
-        printf("copied a solution back to host:");
+        if (checkCudaErrors()) continue;
+        printf("\nCopied a solution back to host:");
         cudaMemcpy(solution, d_solution, solution_size, cudaMemcpyDeviceToHost);
         checkCudaErrors();
         printSolution(solution, offsets, instances[0].oligs, 100);
@@ -258,6 +262,11 @@ int main(int argc, char* argv[]) {
     
     cudaFree(d_solution);
     cudaFree(d_offsets);
+    cudaFree(d_oligs_flat);
+    cudaFree(d_tabu_fragments);
+    cudaFree(d_tabu_count);
+    cudaFree(d_tabu_id);
+    cudaFree(d_used);
 
 
     checkCudaErrors();
