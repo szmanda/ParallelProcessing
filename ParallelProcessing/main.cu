@@ -55,6 +55,15 @@ int correctResult(int* data, const int n, const int b) {
 //}
 
 int main(int argc, char* argv[]) {
+    int param_blocks = 5;
+    int param_threads = 16;
+    int param_iterations = 1;
+    if (argc >= 4) {
+        param_blocks = std::stoi(argv[1]);
+        param_threads = std::stoi(argv[2]);
+        param_iterations = std::stoi(argv[3]);
+    }
+
 
     Utils::projectDirectory = "C:\\Users\\Michal\\Documents\\Projects\\ParallelProcessing";
     std::vector<Instance> instances = Utils::LoadInstances();
@@ -200,18 +209,22 @@ int main(int argc, char* argv[]) {
     int local_tabu_fragment_length = 5;
 
 
-    dim3 threads(1);  // number of threads per block
-    dim3 blocks(1);
-    unsigned int solution_size = s * sizeof(int);
+    dim3 threads(param_threads);  // number of threads per block
+    dim3 blocks(param_blocks);
+    unsigned int solution_size = blocks.x * threads.x * s * sizeof(int);
     unsigned int offsets_size = s * s * sizeof(int);
     unsigned int oligs_flat_size = s * l * sizeof(char);
-    unsigned int tabu_fragments_size = local_tabu_limit * local_tabu_fragment_length * sizeof(int);
+    unsigned int tabu_fragments_size = blocks.x * threads.x * local_tabu_limit * local_tabu_fragment_length * sizeof(int);
     unsigned int tabu_count_size = sizeof(int);
     unsigned int tabu_id_size = sizeof(int);
-    unsigned int used_size = s* sizeof(bool);
+    unsigned int used_size = blocks.x * threads.x * s * sizeof(bool);
+
+    printf("Total memory usage: %d", solution_size + offsets_size + oligs_flat_size + tabu_fragments_size
+        + tabu_count_size + tabu_id_size + used_size);
 
     /*for (int i = 0; i < n; i++)
         printf("%d\t", a[i]);*/
+    printf("malloc\n");
     cudaMalloc((void**)&d_solution, solution_size);
     cudaMalloc((void**)&d_offsets, offsets_size);
     cudaMalloc((void**)&d_oligs_flat, oligs_flat_size);
@@ -219,36 +232,51 @@ int main(int argc, char* argv[]) {
     cudaMalloc((void**)&d_tabu_count, tabu_count_size);
     cudaMalloc((void**)&d_tabu_id, tabu_id_size);
     cudaMalloc((void**)&d_used, used_size);
+    checkCudaErrors();
 
+    printf("memset\n");
     cudaMemset(d_tabu_count, 0, tabu_count_size);
     cudaMemset(d_tabu_id, 0, tabu_id_size);
+    checkCudaErrors();
     
-    cudaMemcpy(d_solution, solution, solution_size, cudaMemcpyHostToDevice);
+    printf("memcopy\n");
+    /*for (int j = 0; j < blocks.x * threads.x; j++) {
+        cudaMemcpy(&d_solution[j * s], greedy[j], s * sizeof(int), cudaMemcpyHostToDevice);
+    }*/
     cudaMemcpy(d_offsets, offsets_flat, offsets_size, cudaMemcpyHostToDevice);
     cudaMemcpy(d_oligs_flat, oligs_flat, oligs_flat_size, cudaMemcpyHostToDevice);
     checkCudaErrors();
     
-    // cudaDeviceSetLimit(cudaLimitDevRuntimeSyncDepth, 20);
-    for (int i = 0; i < 5; i++) {
-        cudaMemset(d_used, 0, used_size);
-        kernelTabuSearch <<< blocks, threads >>> (
-            d_solution,
-            d_offsets,
-            s,
-            instances[i].n,
-            d_oligs_flat,
-            d_tabu_fragments,
-            local_tabu_limit,
-            local_tabu_fragment_length,
-            d_tabu_count,
-            d_tabu_id,
-            d_used
-        );
-        cudaDeviceSynchronize();
-        printf("\nkernel %d completed. ", i);
+    int batches = s / (blocks.x * threads.x); // full iterations - ignoring the potential remainder
+    for (int j = 0; j < batches; j++) {
+        printf("memcopy %d/%d batch\n", j + 1, batches);
+        for (int k = 0; k < blocks.x * threads.x; k++) {
+            cudaMemcpy(&d_solution[k * s], greedy[j], k * sizeof(int), cudaMemcpyHostToDevice);
+        }
+        for (int k = 0; k < param_iterations; k++) {
+            cudaMemset(d_used, 0, used_size);
+            checkCudaErrors();
+            printf("Starting kernel %d/%d\n", k + 1, param_iterations);
+            kernelTabuSearch <<< blocks, threads >>> (
+                d_solution,
+                d_offsets,
+                s,
+                instances[i].n,
+                d_oligs_flat,
+                d_tabu_fragments,
+                local_tabu_limit,
+                local_tabu_fragment_length,
+                d_tabu_count,
+                d_tabu_id,
+                d_used
+                );
+            cudaDeviceSynchronize();
+            printf("kernel %d/%d completed.\n", k + 1, param_iterations);
+        }
         if (checkCudaErrors()) continue;
-        printf("\nCopied a solution back to host:");
-        cudaMemcpy(solution, d_solution, solution_size, cudaMemcpyDeviceToHost);
+        printf("Finished  %d/%d batch\n", j + 1, batches);
+        printf("Copied first solution back to host:");
+        cudaMemcpy(solution, d_solution, s * sizeof(int), cudaMemcpyDeviceToHost);
         checkCudaErrors();
         printSolution(solution, offsets, instances[0].oligs, 100);
         printf("\t\t\t . . .\n\n\n");

@@ -1,7 +1,7 @@
 #include "Utils.cuh"
 #include <fstream>
 #include <iostream>
-#include <stdio.h>
+//#include <stdio.h>
 #include <windows.h>
 
 std::string Utils::projectDirectory = "";

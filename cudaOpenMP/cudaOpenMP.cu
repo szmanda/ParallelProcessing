@@ -34,7 +34,7 @@
 #include <cuda_runtime.h>
 #include "device_launch_parameters.h"
 #include <omp.h>
-#include <stdio.h>  // stdio functions are used since C++ streams aren't necessarily thread safe
+// #include <stdio.h>  // stdio functions are used since C++ streams aren't necessarily thread safe
 
 using namespace std;
 
