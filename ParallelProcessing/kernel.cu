@@ -63,8 +63,8 @@ __global__ void kernelTabuSearch(
     bool* used = &used_shared[thread * s];
 
     /// Simple Tabu Search from one of the vertices
-    printf("== BEGIN KernelTabuSearch %d == \t start: %d %.10s, s: %d, n: %d, tabuLimit: %d, tabuFragmentLength: %d, tabuCount: %d, tabuId %d,\r\n",
-        thread, solution[0], &oligs_flat[solution[0] * 10], s, n, tabuLimit, tabuFragmentLength, *tabuCount, *tabuId);
+    // printf("== BEGIN KernelTabuSearch %d == \t start: %d %.10s, s: %d, n: %d, tabuLimit: %d, tabuFragmentLength: %d, tabuCount: %d, tabuId %d,\r\n",
+    //    thread, solution[0], &oligs_flat[solution[0] * 10], s, n, tabuLimit, tabuFragmentLength, *tabuCount, *tabuId);
     
     // populating tabu list (for the first iteration)
     if (*tabuCount == 0) {
@@ -212,5 +212,5 @@ __global__ void kernelTabuSearch(
     delete[] infringementId;
     //delete[] used;
 
-    printf("== END KernelTabuSearch %d ==\n", thread);
+    // printf("== END KernelTabuSearch %d ==\n", thread);
 }

@@ -40,7 +40,79 @@ int checkCudaErrors() {
 //    printf("\n\n");
 //}
 
+//int benchmark();
+////int run(int argc, char* argv[]);
+//
+//int ma(int argc, char* argv[]) {
+//    freopen("NUL", "w", stdout);
+//    if (argc > 1 && std::string(argv[1]) == "benchmark") return benchmark();
+//    //else return run(argc, argv);
+//    return 0;
+//}
+
+int benchmark() {
+    std::vector<int> blocks = { 8, 1, 2, 4, 8, 16, 32, 64, 128, 256 };
+    std::vector<int> threads = { 64, 1, 2, 4, 8, 16, 32, 64, 128, 256 };
+    std::vector<int> iterations = { 1 };
+
+    int total_c = blocks.size() * threads.size() * iterations.size();
+    int c = 0;
+
+    std::cout << "total:" << total_c << std::endl;
+    std::cout << "blocks,threads,iterations,time,completed" << std::endl;
+
+    for (int b : blocks) {
+        for (int t : threads) {
+            for (int i : iterations) {
+                if (c < 5) { c++; continue; }
+                char argv1[10];
+                char argv2[10];
+                char argv3[10];
+                char argv4[10];
+                snprintf(argv1, sizeof(argv1), "%d", b);
+                snprintf(argv2, sizeof(argv2), "%d", t);
+                snprintf(argv3, sizeof(argv3), "%d", i);
+                snprintf(argv4, sizeof(argv4), "%d", 0);
+                char* argv[] = { "benchmark", argv1, argv2, argv3, argv4 };
+                int argc = 5;
+
+                freopen("NUL", "w", stdout);
+
+                cudaEvent_t start, stop;
+                cudaEventCreate(&start);
+                cudaEventCreate(&stop);
+                    cudaEventRecord(start, 0);
+                    //run(argc, argv);
+                    cudaEventRecord(stop, 0);
+                cudaEventSynchronize(stop);
+
+                float milliseconds = 0;
+                cudaEventElapsedTime(&milliseconds, start, stop);
+                float seconds = milliseconds / 1000.0;
+
+                freopen("CON", "w", stdout);
+
+                // Print the execution time
+                std::cout << b << "," << t << "," << i << "," << seconds << "," << c + 1 << "/" << total_c << std::endl;
+
+                // Destroy CUDA events
+                cudaEventDestroy(start);
+                cudaEventDestroy(stop);
+                checkCudaErrors();
+                cudaDeviceReset();
+
+                c++;
+
+                if (checkCudaErrors()) return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+
 int main(int argc, char* argv[]) {
+    freopen("NUL", "w", stdout);
     int param_blocks = 4;
     int param_threads = 64;
     int param_iterations = 1;
@@ -233,7 +305,7 @@ int main(int argc, char* argv[]) {
     checkCudaErrors();
     
     int batches = s / (blocks.x * threads.x); // full batches - ignoring the potential remainder
-    for (int j = 0; j <= batches; j++) {
+    for (int j = 0; j < batches; j++) {
         if (j == batches) { // last batch (remainder)
             threads = dim3(s % (blocks.x * threads.x));
             blocks = dim3(1);
@@ -287,5 +359,6 @@ int main(int argc, char* argv[]) {
     checkCudaErrors();
 
     printf("Finished!");
-    exit(0);
+    
+    return 0;
 }
