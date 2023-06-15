@@ -18,20 +18,6 @@ int checkCudaErrors() {
     return err;
 }
 
-// a simple kernel that simply increments each array element by b
-__global__ void kernelAddConstant(int* g_a, const int b) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    g_a[idx] += b;
-}
-
-// a predicate that checks whether each array element is set to its index plus b
-int correctResult(int* data, const int n, const int b) {
-    for (int i = 0; i < n; i++)
-        if (data[i] != i + b) return 0;
-
-    return 1;
-}
-
 //char* toChar(const std::vector<char>& olig, int l = 10) {
 //    char* result = new char[l+1];
 //    for (int i = 0; i < l; i++)
@@ -55,15 +41,14 @@ int correctResult(int* data, const int n, const int b) {
 //}
 
 int main(int argc, char* argv[]) {
-    int param_blocks = 5;
-    int param_threads = 16;
+    int param_blocks = 4;
+    int param_threads = 64;
     int param_iterations = 1;
-    if (argc >= 4) {
-        param_blocks = std::stoi(argv[1]);
-        param_threads = std::stoi(argv[2]);
-        param_iterations = std::stoi(argv[3]);
-    }
-
+    int param_instance_id = 0;
+    if (argc >= 2) param_blocks = std::stoi(argv[1]);
+    if (argc >= 3) param_threads = std::stoi(argv[2]);
+    if (argc >= 4) param_iterations = std::stoi(argv[3]);
+    if (argc >= 5) param_instance_id = std::stoi(argv[4]);
 
     Utils::projectDirectory = "C:\\Users\\Michal\\Documents\\Projects\\ParallelProcessing";
     std::vector<Instance> instances = Utils::LoadInstances();
@@ -72,7 +57,7 @@ int main(int argc, char* argv[]) {
         std::cout << instances[i].toString() << "\n";
     }*/
 
-    int i = 0;
+    int i = param_instance_id;
     instances[i].oligs;
     int s = instances[i].s;
     int l = instances[i].l;
@@ -111,7 +96,7 @@ int main(int argc, char* argv[]) {
             offsets_flat[ii * s + j] = offsets[ii][j];
         }
     }
-    /// Display offset matrix
+    /// Print offset matrix
     /*for (int o1 = 0; o1 < s; o1++) {
         std::cout << toChar(instances[i].oligs[o1]) << "\t";
     }
@@ -247,8 +232,14 @@ int main(int argc, char* argv[]) {
     cudaMemcpy(d_oligs_flat, oligs_flat, oligs_flat_size, cudaMemcpyHostToDevice);
     checkCudaErrors();
     
-    int batches = s / (blocks.x * threads.x); // full iterations - ignoring the potential remainder
-    for (int j = 0; j < batches; j++) {
+    int batches = s / (blocks.x * threads.x); // full batches - ignoring the potential remainder
+    for (int j = 0; j <= batches; j++) {
+        if (j == batches) { // last batch (remainder)
+            threads = dim3(s % (blocks.x * threads.x));
+            blocks = dim3(1);
+            if (threads.x == 0) break;
+            printf("Last batch: handling the remainder of the batch division\n");
+        }
         printf("memcopy %d/%d batch\n", j + 1, batches);
         for (int k = 0; k < blocks.x * threads.x; k++) {
             cudaMemcpy(&d_solution[k * s], greedy[j], k * sizeof(int), cudaMemcpyHostToDevice);
@@ -275,7 +266,7 @@ int main(int argc, char* argv[]) {
         }
         if (checkCudaErrors()) continue;
         printf("Finished  %d/%d batch\n", j + 1, batches);
-        printf("Copied first solution back to host:");
+        printf("Copied first solution back to host:\n\n");
         cudaMemcpy(solution, d_solution, s * sizeof(int), cudaMemcpyDeviceToHost);
         checkCudaErrors();
         printSolution(solution, offsets, instances[0].oligs, 100);
@@ -286,8 +277,6 @@ int main(int argc, char* argv[]) {
         printf("\r\n\n\n");
     }
     checkCudaErrors();
-    cudaMemcpy(solution, d_solution, solution_size, cudaMemcpyDeviceToHost);
-    
     cudaFree(d_solution);
     cudaFree(d_offsets);
     cudaFree(d_oligs_flat);
@@ -295,102 +284,8 @@ int main(int argc, char* argv[]) {
     cudaFree(d_tabu_count);
     cudaFree(d_tabu_id);
     cudaFree(d_used);
-
-
     checkCudaErrors();
+
     printf("Finished!");
     exit(0);
-
-    /////////////////////////////////////////////////////////////////
-    // display CPU and GPU configuration
-    //
-    printf("number of host CPUs:\t%d\n", omp_get_num_procs());
-    printf("number of CUDA devices:\t%d\n", num_gpus);
-
-    for (int i = 0; i < num_gpus; i++) {
-        cudaDeviceProp dprop;
-        cudaGetDeviceProperties(&dprop, i);
-        printf("   %d: %s\n", i, dprop.name);
-    }
-
-    printf("---------------------------\n");
-
-    /////////////////////////////////////////////////////////////////
-    // initialize data
-    //
-    unsigned int n = num_gpus * 8192;
-    unsigned int nbytes = n * sizeof(int);
-    int* a = 0;  // pointer to data on the CPU
-    int b = 3;   // value by which the array is incremented
-    a = (int*)malloc(nbytes);
-
-    if (0 == a) {
-        printf("couldn't allocate CPU memory\n");
-        return 1;
-    }
-
-    for (unsigned int i = 0; i < n; i++) a[i] = i;
-
-    ////////////////////////////////////////////////////////////////
-    // run as many CPU threads as there are CUDA devices
-    //   each CPU thread controls a different device, processing its
-    //   portion of the data.  It's possible to use more CPU threads
-    //   than there are CUDA devices, in which case several CPU
-    //   threads will be allocating resources and launching kernels
-    //   on the same device.  For example, try omp_set_num_threads(2*num_gpus);
-    //   Recall that all variables declared inside an "omp parallel" scope are
-    //   local to each CPU thread
-    //
-omp_set_num_threads(num_gpus);  // create as many CPU threads as there are CUDA devices
-//omp_set_num_threads(2*num_gpus);// create twice as many CPU threads as there
-  // are CUDA devices
-#pragma omp parallel
-    {
-        unsigned int cpu_thread_id = omp_get_thread_num();
-        unsigned int num_cpu_threads = omp_get_num_threads();
-
-        // set and check the CUDA device for this CPU thread
-        int gpu_id = -1;
-        cudaSetDevice(
-            cpu_thread_id %
-            num_gpus);
-        cudaGetDevice(&gpu_id);
-        printf("CPU thread %d (of %d) uses CUDA device %d\n", cpu_thread_id,
-            num_cpu_threads, gpu_id);
-
-        int* d_a = 0;  // pointer to memory on the device associated with this CPU thread
-        int* sub_a = a + cpu_thread_id * n / num_cpu_threads;  // pointer to this CPU thread's portion of data
-        unsigned int nbytes_per_kernel = nbytes / num_cpu_threads;
-        dim3 gpu_threads(128);  // 128 threads per block
-        dim3 gpu_blocks(n / (gpu_threads.x * num_cpu_threads));
-
-        /*for (int i = 0; i < n; i++)
-            printf("%d\t", a[i]);*/
-        cudaMalloc((void**)&d_a, nbytes_per_kernel);
-
-        cudaMemset(d_a, 0, nbytes_per_kernel);
-        cudaMemcpy(d_a, a, nbytes_per_kernel, cudaMemcpyHostToDevice);
-        checkCudaErrors();
-        kernelAddConstant<<<gpu_blocks, gpu_threads >>>(d_a, b);
-        checkCudaErrors();
-        cudaMemcpy(sub_a, d_a, nbytes_per_kernel, cudaMemcpyDeviceToHost);//);
-        cudaFree(d_a);
-    }
-    printf("---------------------------\n");
-
-    if (cudaSuccess != cudaGetLastError())
-        printf("%s\n", cudaGetErrorString(cudaGetLastError()));
-    else
-        printf("code executed without errors");
-
-    ////////////////////////////////////////////////////////////////
-    // check the result
-    //
-    bool bResult = correctResult(a, n, b);
-
-    //for (int i = 0; i < n; i++)
-    //    printf("%d\t", a[i]);
-    if (a) free(a);  // free CPU memory
-
-    exit(bResult ? EXIT_SUCCESS : EXIT_FAILURE);
 }
